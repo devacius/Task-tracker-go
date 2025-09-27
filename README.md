@@ -31,7 +31,8 @@ Task Tracker Go is a simple command-line application written in Go for managing 
 Run the application from your terminal:
 
 ```sh
-./tasko
+go install github.com/devacius/tasko@latest
+tasko
 ```
 
 You will be prompted to enter a process:
