@@ -2,70 +2,92 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
-	"strconv" // Added import for strconv.Atoi
-	"strings" // Added import for strings.TrimSpace and strings.ToLower
+	"strconv"
+	"strings"
 )
 
-// Declared tasks as a global variable to make it accessible to all functions
-// Old: var tasks []task (inside main, causing undefined variable errors)
-// New: Global declaration
-var tasks []task
+// Global slice of tasks
+var tasks []Task
 
-type task struct {
-	id          int
-	name        string
-	description string
-	status      string
+// ✅ Struct fields must be exported (capitalized) to be JSON serialized
+// ✅ Removed invalid `int.` and `string.`
+// ✅ Fixed struct tags
+type Task struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+}
+
+// ✅ Fixed error handling with proper checks
+func updateJSON() {
+	jsonData, err := json.MarshalIndent(tasks, "", " ")
+	if err != nil {
+		fmt.Println("Error during JSON marshal:", err)
+		return
+	}
+	if err := os.WriteFile("tasks.json", jsonData, 0644); err != nil {
+		fmt.Println("Error writing to file:", err)
+	}
 }
 
 func main() {
+		// ✅ Load tasks from tasks.json at startup
+	fileData, err := os.ReadFile("tasks.json")
+	if err == nil { // file exists
+		if len(fileData) > 0 {
+			err = json.Unmarshal(fileData, &tasks)
+			if err != nil {
+				fmt.Println("Error parsing tasks.json:", err)
+			} else {
+				fmt.Println("Loaded tasks from tasks.json")
+			}
+		}
+	} else {
+		// If file doesn't exist, no problem — start fresh
+		fmt.Println("No existing tasks.json found, starting with empty task list")
+	}
+
 	reader := bufio.NewReader(os.Stdin)
-	// Added loop to allow multiple actions until user chooses to exit
+	
 	for {
-		fmt.Println("Hello World")
 		fmt.Print("Enter the process you want to take (add/change_status/update/delete/list/exit): ")
 		text, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println("Error reading input:", err)
 			continue
 		}
-		// Trim input and convert to lowercase for case-insensitive comparison
-		// Old: if (text == "add") { ... }
-		// New: strings.ToLower(strings.TrimSpace(text)) to handle newlines and case variations
+
 		text = strings.ToLower(strings.TrimSpace(text))
 
 		switch text {
 		case "add":
-			add_new_task(reader) // Pass reader to reuse it
+			addNewTask(reader)
 		case "change_status":
-			change_status(reader)
+			changeStatus(reader)
 		case "update":
-			update_existing_task(reader)
+			updateExistingTask(reader)
 		case "delete":
-			delete_task(reader)
+			deleteTask(reader)
 		case "list":
-			list_tasks()
+			listTasks()
 		case "exit":
 			fmt.Println("Exiting program")
 			return
 		default:
 			fmt.Println("Please enter a valid choice")
 		}
+
+		updateJSON()
 	}
 }
 
-func change_status(reader *bufio.Reader) {
+func changeStatus(reader *bufio.Reader) {
 	fmt.Print("Enter the task id: ")
-	taskIDStr, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading task ID:", err)
-		return
-	}
-	// Trim input and convert to int
-	// Old: task_id, _ := reader.ReadString('\n'); if value.id == task_id
-	// New: Convert taskIDStr to int and handle error
+	taskIDStr, _ := reader.ReadString('\n')
 	taskIDStr = strings.TrimSpace(taskIDStr)
 	taskID, err := strconv.Atoi(taskIDStr)
 	if err != nil {
@@ -73,121 +95,76 @@ func change_status(reader *bufio.Reader) {
 		return
 	}
 
-	found := false
-	// Update tasks slice directly using index
-	// Old: value.status = task_status (modifying loop copy, no effect)
-	// New: tasks[index].status = taskStatus
 	fmt.Print("Enter task status: ")
-	taskStatus, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading status:", err)
-		return
-	}
+	taskStatus, _ := reader.ReadString('\n')
 	taskStatus = strings.TrimSpace(taskStatus)
 
+	found := false
 	for index, value := range tasks {
-		if value.id == taskID {
-			tasks[index].status = taskStatus
+		if value.ID == taskID {
+			tasks[index].Status = taskStatus
 			fmt.Println("Updated task is:", tasks[index])
 			found = true
 			break
 		}
 	}
-	// Print error only if task not found
-	// Old: Error printed in every loop iteration
-	// New: Use found flag to print error once
+
 	if !found {
 		fmt.Println("Couldn't find the task with ID", taskID)
 	}
 }
 
-func add_new_task(reader *bufio.Reader) {
-	length := len(tasks)
-	if length >= 10 {
+func addNewTask(reader *bufio.Reader) {
+	if len(tasks) >= 10 {
 		fmt.Println("First, complete previous tasks!")
 		return
 	}
-	// Old: new_length := length + 1 (unnecessary variable)
-	// New: Use length + 1 directly in struct
+
 	fmt.Print("Enter the task name: ")
-	taskName, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading task name:", err)
-		return
-	}
+	taskName, _ := reader.ReadString('\n')
 	taskName = strings.TrimSpace(taskName)
 
 	fmt.Print("Enter task description: ")
-	taskDescription, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading description:", err)
-		return
-	}
+	taskDescription, _ := reader.ReadString('\n')
 	taskDescription = strings.TrimSpace(taskDescription)
 
-	// Corrected struct initialization and used "TODO" as string
-	// Old: var new_task task= {id:new_length, name:task_name description:task_description status:TODO}
-	// New: Proper struct initialization with commas and quoted "TODO"
-	newTask := task{
-		id:          length + 1,
-		name:        taskName,
-		description: taskDescription,
-		status:      "TODO",
+	newTask := Task{
+		ID:          len(tasks) + 1,
+		Name:        taskName,
+		Description: taskDescription,
+		Status:      "TODO",
 	}
 
 	tasks = append(tasks, newTask)
 	fmt.Println("Task added successfully")
 }
 
-func update_existing_task(reader *bufio.Reader) {
+func updateExistingTask(reader *bufio.Reader) {
 	fmt.Print("Enter the task id you want to update: ")
-	taskIDStr, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading task ID:", err)
-		return
-	}
-	// Convert task ID to int
-	// Old: value.id == task_id (type mismatch)
-	// New: Convert taskIDStr to int
-	taskIDStr = strings.TrimSpace(taskIDStr)
-	taskID, err := strconv.Atoi(taskIDStr)
+	taskIDStr, _ := reader.ReadString('\n')
+	taskID, err := strconv.Atoi(strings.TrimSpace(taskIDStr))
 	if err != nil {
 		fmt.Println("Invalid task ID, must be a number")
 		return
 	}
 
-	found := false
 	fmt.Print("Enter the field you want to update (name/description): ")
-	updateField, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading field:", err)
-		return
-	}
+	updateField, _ := reader.ReadString('\n')
 	updateField = strings.TrimSpace(updateField)
 
+	found := false
 	for index, value := range tasks {
-		if value.id == taskID {
+		if value.ID == taskID {
 			if updateField == "name" {
 				fmt.Print("Enter the new name: ")
-				newName, err := reader.ReadString('\n')
-				if err != nil {
-					fmt.Println("Error reading new name:", err)
-					return
-				}
-				// Update slice directly
-				// Old: value.name = new_name
-				// New: tasks[index].name = newName
-				tasks[index].name = strings.TrimSpace(newName)
+				newName, _ := reader.ReadString('\n')
+				tasks[index].Name = strings.TrimSpace(newName)
 			} else if updateField == "description" {
 				fmt.Print("Enter the new description: ")
-				newDescription, err := reader.ReadString('\n')
-				if err != nil {
-					fmt.Println("Error reading new description:", err)
-					return
-				}
-				tasks[index].description = strings.TrimSpace(newDescription)
+				newDescription, _ := reader.ReadString('\n')
+				tasks[index].Description = strings.TrimSpace(newDescription)
 			} else {
-				fmt.Println("You need to select a correct field to update (name/description)")
+				fmt.Println("Invalid field (must be name or description)")
 				return
 			}
 			fmt.Println("Final updated task:", tasks[index])
@@ -195,49 +172,46 @@ func update_existing_task(reader *bufio.Reader) {
 			break
 		}
 	}
+
 	if !found {
 		fmt.Println("Couldn't find the task with ID", taskID)
 	}
 }
 
-func delete_task(reader *bufio.Reader) {
+func deleteTask(reader *bufio.Reader) {
 	fmt.Print("Enter the task id you want to delete: ")
-	taskIDStr, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading task ID:", err)
-		return
-	}
-	// Convert task ID to int
-	// Old: value.id == task_id (type mismatch)
-	// New: Convert taskIDStr to int
-	taskIDStr = strings.TrimSpace(taskIDStr)
-	taskID, err := strconv.Atoi(taskIDStr)
+	taskIDStr, _ := reader.ReadString('\n')
+	taskID, err := strconv.Atoi(strings.TrimSpace(taskIDStr))
 	if err != nil {
 		fmt.Println("Invalid task ID, must be a number")
 		return
 	}
 
 	found := false
-	// Fix slice deletion
-	// Old: tasks = append(tasks[:index], s[index+1:]...) (undefined s)
-	// New: Use tasks instead of s
 	for index, value := range tasks {
-		if value.id == taskID {
+		if value.ID == taskID {
 			tasks = append(tasks[:index], tasks[index+1:]...)
-			fmt.Println("Task deleted. New task list:", tasks)
+			listTasks()
 			found = true
 			break
 		}
 	}
+
 	if !found {
 		fmt.Println("Couldn't find the task with ID", taskID)
 	}
 }
 
-func list_tasks() {
+func listTasks() {
 	if len(tasks) == 0 {
 		fmt.Println("No tasks available")
 		return
 	}
-	fmt.Println("Task list is:", tasks)
+	jsonData, err := json.MarshalIndent(tasks, "", "  ")
+	if err != nil {
+		fmt.Println("Error converting tasks to JSON:", err)
+		return
+	}
+
+	fmt.Println("Tasks list is: ",string(jsonData))
 }
