@@ -35,7 +35,7 @@ func updateJSON() {
 }
 
 func main() {
-		// ✅ Load tasks from tasks.json at startup
+	// ✅ Load tasks from tasks.json at startup
 	fileData, err := os.ReadFile("tasks.json")
 	if err == nil { // file exists
 		if len(fileData) > 0 {
@@ -52,7 +52,7 @@ func main() {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	for {
 		fmt.Print("Enter the process you want to take (add/change_status/update/delete/list/exit): ")
 		text, err := reader.ReadString('\n')
@@ -191,6 +191,9 @@ func deleteTask(reader *bufio.Reader) {
 	for index, value := range tasks {
 		if value.ID == taskID {
 			tasks = append(tasks[:index], tasks[index+1:]...)
+			for i := index; i < len(tasks); i++ {
+				tasks[i].ID -= 1
+			}
 			listTasks()
 			found = true
 			break
@@ -213,5 +216,5 @@ func listTasks() {
 		return
 	}
 
-	fmt.Println("Tasks list is: ",string(jsonData))
+	fmt.Println("Tasks list is: ", string(jsonData))
 }
